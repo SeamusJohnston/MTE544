@@ -102,6 +102,8 @@ catkin_package(
 # include_directories(include)
 include_directories(
         ${catkin_INCLUDE_DIRS}
+	include
+	/usr/local/include/eigen3
 )
 
 ## Declare a cpp library
@@ -111,13 +113,23 @@ include_directories(
 
 ## Declare a cpp executable
 add_executable(turtlebot_example_node src/turtlebot_example.cpp)
+add_executable(turtlebot_square_node src/turtlebot_square_node.cpp)
+add_executable(ekf_node src/ekf.cpp)
+
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 # add_dependencies(turtlebot_example_node turtlebot_example_generate_messages_cpp)
+add_dependencies(ekf_node ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(turtlebot_example_node
+        ${catkin_LIBRARIES}
+        )
+target_link_libraries(turtlebot_square_node 
+        ${catkin_LIBRARIES}
+	)
+target_link_libraries(ekf_node
         ${catkin_LIBRARIES}
         )
 
