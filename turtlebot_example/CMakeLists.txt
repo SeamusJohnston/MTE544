@@ -103,7 +103,7 @@ catkin_package(
 include_directories(
         ${catkin_INCLUDE_DIRS}
 	include
-	/usr/local/include/eigen3
+	/usr/include/eigen3/
 )
 
 ## Declare a cpp library
