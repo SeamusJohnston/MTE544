@@ -23,22 +23,27 @@ est_pub_(
                       "/pose_est",
                       10, 
                       true)),
+ips_noise_pub_(
+        nh_.advertise<geometry_msgs::PoseWithCovarianceStamped>(
+                      "/indoor_pos_noise",
+                      10, 
+                      true)),
 gen_(rd_()),
 nd_(0, 0.1)    
 {
-  state_ << 3.07, -0.0138, 1.226;
+  state_ << 3.07, -0.0138, 3.25;
   state_prev_ = state_;
   P_ << 0.00001, 0, 0, 
         0, 0.00001, 0, 
-        0, 0, 0.00001;
-  R_ << 1, 0, 0,
-        0, 1, 0,
         0, 0, 0.01;
-  Q_ << 0.1, 0, 0, 0, 0, 
-        0, 0.1, 0, 0, 0,
-        0, 0, 0.01, 0, 0,
-        0, 0, 0, 0.1, 0, 
-        0, 0, 0, 0, 0.05;
+  R_ << 0.0025, 0, 0,
+        0, 0.0025, 0,
+        0, 0, 0.01;
+  Q_ << 1, 0, 0,// 0, 0, 
+        0, 1, 0,// 0, 0,
+      //  0, 0, 0.01, 0, 0,
+        0, 0, 0.1;// 1, 0, 
+       // 0, 0, 0, 0, 0.05;
   // Initialize P, Q, R with config?
 }
 
@@ -53,21 +58,29 @@ void EKF::IpsCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& 
   tf::Matrix3x3 m(q);
   double roll, pitch, yaw;
   m.getRPY(roll, pitch, yaw);
-  measurement_(int(MEASURE_IDX::theta)) = yaw;
+  measurement_(int(MEASURE_IDX::theta)) = yaw + 3.3;
+
+  geometry_msgs::PoseWithCovarianceStamped noise_msg;
+  noise_msg.pose.pose = msg->pose.pose;
+  noise_msg.pose.pose.position.x = measurement_(int(MEASURE_IDX::x));
+  noise_msg.pose.pose.position.y = measurement_(int(MEASURE_IDX::y));
+  noise_msg.pose.pose.orientation = msg->pose.pose.orientation;
+  ips_noise_pub_.publish(noise_msg);
+
 }
 
 void EKF::OdomCallback(const nav_msgs::Odometry::ConstPtr& msg) {
-  measurement_(int(MEASURE_IDX::v)) = msg->twist.twist.linear.x;
-  measurement_(int(MEASURE_IDX::w)) = msg->twist.twist.angular.z;
+  control_(int(CONTROL_IDX::v)) = msg->twist.twist.linear.x;
+  control_(int(CONTROL_IDX::w)) = msg->twist.twist.angular.z;
 }
 
 void EKF::ControlCallback(const geometry_msgs::Twist::ConstPtr& msg) {
-  control_(int(CONTROL_IDX::v)) = msg->linear.x;
-  control_(int(CONTROL_IDX::w)) = msg->angular.z;
+  // control_(int(CONTROL_IDX::v)) = msg->linear.x;
+  // control_(int(CONTROL_IDX::w)) = msg->angular.z;
 }
 
 void EKF::UpdateState() {
-  state_prev_ = state_;
+  //state_prev_ = state_;
   state_(int(STATE_IDX::x)) += control_(int(CONTROL_IDX::v))*cos(state_(int(STATE_IDX::theta)))*dt_;
   state_(int(STATE_IDX::y)) += control_(int(CONTROL_IDX::v))*sin(state_(int(STATE_IDX::theta)))*dt_;
   state_(int(STATE_IDX::theta)) += control_(int(CONTROL_IDX::w))*dt_;
@@ -78,12 +91,12 @@ void EKF::UpdateMatrices() {
         0, 1, dt_*control_(int(CONTROL_IDX::v))*cos(state_(int(STATE_IDX::theta))),
         0, 0, 1;
 
-  float d = sqrt(pow(state_(int(STATE_IDX::x)),2) + pow(state_(int(STATE_IDX::y)),2));
+  //float d = sqrt(pow(state_(int(STATE_IDX::x)),2) + pow(state_(int(STATE_IDX::y)),2));
   H_ << 1, 0, 0, 
         0, 1, 0,
-        state_(int(STATE_IDX::x))/(dt_*d + pow(10,-9)), state_(int(STATE_IDX::y))/(dt_*d + pow(10,-9)), 0, // May want to add back the offsets here
-        0, 0, 1,
-        0, 0, 1/dt_; // May want to add back the offsets here too
+        //state_(int(STATE_IDX::x))/(dt_*d + pow(10,-9)), state_(int(STATE_IDX::y))/(dt_*d + pow(10,-9)), 0, // May want to add back the offsets here
+        0, 0, 1;
+        //0, 0, 1/dt_; // May want to add back the offsets here too
 }
 
 void EKF::Update() {
@@ -93,14 +106,15 @@ void EKF::Update() {
 
   P_ = F_*P_*F_.transpose() + R_; // Estimate cov
   
-  Eigen::Matrix<float, 3, 5> K = P_*H_.transpose()*(H_*P_*H_.transpose() + Q_).inverse(); // Kalman gain
+  Eigen::Matrix<float, 3, 3> K = P_*H_.transpose()*(H_*P_*H_.transpose() + Q_).inverse(); // Kalman gain
 
   // Update step
-  float d = sqrt(pow(state_(int(STATE_IDX::x)),2) + pow(state_(int(STATE_IDX::y)),2));
-  float d_prev = sqrt(pow(state_prev_(int(STATE_IDX::x)),2) + pow(state_prev_(int(STATE_IDX::y)),2));
-  Eigen::Matrix<float, 5, 1> h_x; // h(x)
-  h_x << state_(int(STATE_IDX::x)), state_(int(STATE_IDX::y)), (d - d_prev)/dt_, state_(int(STATE_IDX::theta)), (state_(int(STATE_IDX::theta)) - state_prev_(int(STATE_IDX::theta)))/dt_;
-  state_ += K*(measurement_ - h_x);
+  //float d = sqrt(pow(state_(int(STATE_IDX::x)),2) + pow(state_(int(STATE_IDX::y)),2));
+  //float d_prev = sqrt(pow(state_prev_(int(STATE_IDX::x)),2) + pow(state_prev_(int(STATE_IDX::y)),2));
+  //Eigen::Matrix<float, 5, 1> h_x; // h(x)
+  //h_x << state_(int(STATE_IDX::x)), state_(int(STATE_IDX::y)), (d - d_prev)/dt_, state_(int(STATE_IDX::theta)), (state_(int(STATE_IDX::theta)) - state_prev_(int(STATE_IDX::theta)))/dt_;
+  state_ += K*(measurement_ - state_);
+  // ROS_INFO("Delta heading: %f", state_(int(STATE_IDX::theta)) -measurement_(int(MEASURE_IDX::theta)));
 
   P_ = (Eigen::Matrix3f::Identity() - K*H_)*P_;
 
