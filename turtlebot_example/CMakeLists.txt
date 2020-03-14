@@ -107,9 +107,9 @@ include_directories(
 )
 
 ## Declare a cpp library
-# add_library(turtlebot_example
-#   src/${PROJECT_NAME}/turtlebot_example.cpp
-# )
+add_library(mapper_node
+  src/mapper_node.cpp
+)
 
 ## Declare a cpp executable
 add_executable(turtlebot_example_node src/turtlebot_example.cpp)
@@ -121,6 +121,7 @@ add_executable(ekf_node src/ekf.cpp)
 ## as an example, message headers may need to be generated before nodes
 # add_dependencies(turtlebot_example_node turtlebot_example_generate_messages_cpp)
 add_dependencies(ekf_node ${catkin_EXPORTED_TARGETS})
+add_dependencies(mapper_node ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(turtlebot_example_node
@@ -130,6 +131,9 @@ target_link_libraries(turtlebot_square_node
         ${catkin_LIBRARIES}
 	)
 target_link_libraries(ekf_node
+        ${catkin_LIBRARIES}
+        )
+target_link_libraries(mapper_node
         ${catkin_LIBRARIES}
         )
 

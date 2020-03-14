@@ -13,11 +13,6 @@ odom_sub_(
                       10,
                       &EKF::OdomCallback,
                       this)),
-control_sub_(
-        nh_.subscribe("/cmd_vel_mux/input/teleop",
-                      10,
-                      &EKF::ControlCallback,
-                      this)),
 est_pub_(
         nh_.advertise<geometry_msgs::PoseWithCovariance>(
                       "/pose_est",
@@ -32,19 +27,15 @@ gen_(rd_()),
 nd_(0, 0.1)    
 {
   state_ << 3.07, -0.0138, 3.25;
-  state_prev_ = state_;
   P_ << 0.00001, 0, 0, 
         0, 0.00001, 0, 
         0, 0, 0.01;
   R_ << 0.0025, 0, 0,
         0, 0.0025, 0,
         0, 0, 0.01;
-  Q_ << 1, 0, 0,// 0, 0, 
-        0, 1, 0,// 0, 0,
-      //  0, 0, 0.01, 0, 0,
-        0, 0, 0.1;// 1, 0, 
-       // 0, 0, 0, 0, 0.05;
-  // Initialize P, Q, R with config?
+  Q_ << 1, 0, 0,
+        0, 1, 0,
+        0, 0, 0.1;
 }
 
 void EKF::IpsCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& msg) {
@@ -74,13 +65,7 @@ void EKF::OdomCallback(const nav_msgs::Odometry::ConstPtr& msg) {
   control_(int(CONTROL_IDX::w)) = msg->twist.twist.angular.z;
 }
 
-void EKF::ControlCallback(const geometry_msgs::Twist::ConstPtr& msg) {
-  // control_(int(CONTROL_IDX::v)) = msg->linear.x;
-  // control_(int(CONTROL_IDX::w)) = msg->angular.z;
-}
-
 void EKF::UpdateState() {
-  //state_prev_ = state_;
   state_(int(STATE_IDX::x)) += control_(int(CONTROL_IDX::v))*cos(state_(int(STATE_IDX::theta)))*dt_;
   state_(int(STATE_IDX::y)) += control_(int(CONTROL_IDX::v))*sin(state_(int(STATE_IDX::theta)))*dt_;
   state_(int(STATE_IDX::theta)) += control_(int(CONTROL_IDX::w))*dt_;
@@ -91,12 +76,9 @@ void EKF::UpdateMatrices() {
         0, 1, dt_*control_(int(CONTROL_IDX::v))*cos(state_(int(STATE_IDX::theta))),
         0, 0, 1;
 
-  //float d = sqrt(pow(state_(int(STATE_IDX::x)),2) + pow(state_(int(STATE_IDX::y)),2));
   H_ << 1, 0, 0, 
         0, 1, 0,
-        //state_(int(STATE_IDX::x))/(dt_*d + pow(10,-9)), state_(int(STATE_IDX::y))/(dt_*d + pow(10,-9)), 0, // May want to add back the offsets here
         0, 0, 1;
-        //0, 0, 1/dt_; // May want to add back the offsets here too
 }
 
 void EKF::Update() {
@@ -109,17 +91,9 @@ void EKF::Update() {
   Eigen::Matrix<float, 3, 3> K = P_*H_.transpose()*(H_*P_*H_.transpose() + Q_).inverse(); // Kalman gain
 
   // Update step
-  //float d = sqrt(pow(state_(int(STATE_IDX::x)),2) + pow(state_(int(STATE_IDX::y)),2));
-  //float d_prev = sqrt(pow(state_prev_(int(STATE_IDX::x)),2) + pow(state_prev_(int(STATE_IDX::y)),2));
-  //Eigen::Matrix<float, 5, 1> h_x; // h(x)
-  //h_x << state_(int(STATE_IDX::x)), state_(int(STATE_IDX::y)), (d - d_prev)/dt_, state_(int(STATE_IDX::theta)), (state_(int(STATE_IDX::theta)) - state_prev_(int(STATE_IDX::theta)))/dt_;
   state_ += K*(measurement_ - state_);
-  // ROS_INFO("Delta heading: %f", state_(int(STATE_IDX::theta)) -measurement_(int(MEASURE_IDX::theta)));
-
   P_ = (Eigen::Matrix3f::Identity() - K*H_)*P_;
-
   ROS_INFO("State Est: x: %f, y: %f, theta: %f", state_(int(STATE_IDX::x)), state_(int(STATE_IDX::y)), state_(int(STATE_IDX::theta))*180/M_PI);
-
   Publish();
 }
 

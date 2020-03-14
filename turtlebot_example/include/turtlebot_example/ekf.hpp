@@ -25,9 +25,7 @@ class EKF {
   enum class MEASURE_IDX{
     x,
     y, 
-    //v,
     theta
-    //w
   };
 
  private:
@@ -35,11 +33,9 @@ class EKF {
   float dt_;
   ros::Subscriber ips_sub_;
   ros::Subscriber odom_sub_;
-  ros::Subscriber control_sub_;
   ros::Publisher est_pub_;
   ros::Publisher ips_noise_pub_;
   Eigen::Vector3f state_;
-  Eigen::Vector3f state_prev_;
   Eigen::Vector2f control_;
   Eigen::Matrix<float, 3, 1> measurement_;
   Eigen::Matrix3f F_; // State Transition
